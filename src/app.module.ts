@@ -6,6 +6,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import globalConfiguration from './config/global.config';
 import dbConfig from './database/db.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { GlobalModule } from './modules/global.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       useFactory: async (configService: ConfigService) =>
         configService.get('dbConfig'),
     }),
+    GlobalModule,
   ],
   controllers: [AppController],
   providers: [AppService, Logger],
