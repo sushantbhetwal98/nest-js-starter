@@ -1,16 +1,23 @@
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import globalConfiguration from './config/global.config';
+import dbConfig from './database/db.config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-      load: [globalConfiguration],
+      load: [globalConfiguration, dbConfig],
+    }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) =>
+        configService.get('dbConfig'),
     }),
   ],
   controllers: [AppController],
