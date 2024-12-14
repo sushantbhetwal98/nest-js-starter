@@ -8,8 +8,8 @@ import { CustomValidationPipe } from './common/pipe/custom-validation.pipe';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // custom exception filter
-  const logger = new Logger();
-  app.useGlobalFilters(new CustomExceptionFilter(logger));
+  const loggerInstance = app.get(Logger);
+  app.useGlobalFilters(new CustomExceptionFilter(loggerInstance));
   // custom validation pipe
   app.useGlobalPipes(
     new CustomValidationPipe({
@@ -18,7 +18,9 @@ async function bootstrap() {
       stopAtFirstError: true,
     }),
   );
-
+  app.enableCors({
+    origin: '*',
+  });
   await app.listen(globalConfiguration().PORT);
 }
 bootstrap();
