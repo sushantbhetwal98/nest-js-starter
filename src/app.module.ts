@@ -7,6 +7,7 @@ import globalConfiguration from './config/global.config';
 import dbConfig from './database/db.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GlobalModule } from './modules/global.module';
+import { ExternalServicesModule } from './modules/external-services/external-services.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { GlobalModule } from './modules/global.module';
         configService.get('dbConfig'),
     }),
     GlobalModule,
+    ExternalServicesModule,
   ],
   controllers: [AppController],
   providers: [AppService, Logger],
