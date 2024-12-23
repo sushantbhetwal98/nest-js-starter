@@ -27,7 +27,7 @@ export class CustomExceptionFilter implements ExceptionFilter {
       `${request.method} ${request.originalUrl} ${status} ${message}`,
     );
 
-    console.log(exception);
+    // console.log(exception);
 
     response.status(status).json({
       statusCode: status,

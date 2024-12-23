@@ -12,7 +12,7 @@ export abstract class AbstractEntity {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: false })
   is_archived: boolean;
 
   @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })

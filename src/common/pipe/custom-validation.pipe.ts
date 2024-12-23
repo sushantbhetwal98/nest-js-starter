@@ -28,7 +28,7 @@ class CustomValidationPipe extends ValidationPipe {
           : error.property;
         if (error.constraints) {
           return Object.values(error.constraints).map(
-            (message) => `${propertyPath} ${message}`,
+            (message) => `${message}`,
           );
         }
         if (error.children && error.children.length > 0) {
