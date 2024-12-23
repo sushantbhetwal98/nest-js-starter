@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/createUser.dto';
 import { VerifyUserDto } from './dto/verifyUser.dto';
 import { ResendOtpDto } from './dto/resendOtp.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('user')
 export class AuthController {
@@ -32,6 +33,15 @@ export class AuthController {
     return {
       data,
       message: 'OTP resend to your email.',
+    };
+  }
+
+  @Post('/login')
+  async login(@Body() credentialsPayload: LoginDto) {
+    const data = await this.authService.login(credentialsPayload);
+    return {
+      data,
+      message: 'Login Successful',
     };
   }
 }

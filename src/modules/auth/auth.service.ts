@@ -14,6 +14,10 @@ import { generateOTP } from 'src/common/utils/generate-otp.utils';
 import { CreateUserDto } from './dto/createUser.dto';
 import { EmailService } from '../external-services/email/email.service';
 import { VerifyUserDto } from './dto/verifyUser.dto';
+import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { userInterface } from './interfaces/user.interface';
+import globalConfig from 'src/config/global.config';
 
 @Injectable()
 export class AuthService {
@@ -22,10 +26,11 @@ export class AuthService {
     private readonly userRepo: Repository<UserEntity>,
     private readonly emailService: EmailService,
     private readonly dataSource: DataSource,
+    private readonly jwtService: JwtService,
   ) {}
 
-  private hashValue(value: string) {
-    const salt = crypto.randomBytes(16).toString('hex');
+  private hashValue(value: string, defaultsalt?: string) {
+    const salt = defaultsalt ?? crypto.randomBytes(16).toString('hex');
     const hashedValue = crypto
       .createHmac('sha256', salt)
       .update(value)
@@ -37,6 +42,30 @@ export class AuthService {
     };
   }
 
+  private async createTokens(user: userInterface) {
+    const accessToken = await this.jwtService.sign(
+      { user },
+      {
+        secret: globalConfig().AUTH.JWT_SECRET,
+        expiresIn: globalConfig().AUTH.ACCESS_TOKEN_EXPIRY,
+      },
+    );
+    const refreshToken = await this.jwtService.sign(
+      { id: user.id },
+      {
+        secret: globalConfig().AUTH.JWT_SECRET,
+        expiresIn: globalConfig().AUTH.REFRESH_TOKEN_EXPIRY,
+      },
+    );
+
+    return {
+      accessToken,
+      access_expires: this.jwtService.decode(accessToken).exp,
+      refreshToken,
+      refresh_expires: this.jwtService.decode(refreshToken).exp,
+    };
+  }
+
   async getUserByEmail(email: string) {
     try {
       const existingUser = await this.userRepo
@@ -44,9 +73,9 @@ export class AuthService {
         .where('email = :email', { email })
         .getOne();
 
-      if (!existingUser) {
-        throw new NotFoundException('User with the email not found.');
-      }
+      // if (!existingUser) {
+      //   throw new NotFoundException('User with the email not found.');
+      // }
       return existingUser;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -108,6 +137,11 @@ export class AuthService {
   async verifyUser(verifyUserPayload: VerifyUserDto) {
     try {
       const existingUser = await this.getUserByEmail(verifyUserPayload.email);
+
+      if (!existingUser) {
+        throw new NotFoundException('User with the email doesnot exists');
+      }
+
       if (existingUser.is_active) {
         throw new BadRequestException('User already verified');
       }
@@ -185,6 +219,30 @@ export class AuthService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async login(credentials: LoginDto) {
+    try {
+      const { password, password_salt, otp, ...existingUser } =
+        await this.getUserByEmail(credentials.email);
+      if (!existingUser) {
+        throw new BadRequestException('Invalid Credentials');
+      }
+
+      const newHashData = this.hashValue(credentials.password, password_salt);
+
+      if (newHashData.hashedValue !== password) {
+        throw new BadRequestException('Invalid Credentials');
+      }
+
+      const tokens = await this.createTokens(existingUser);
+
+      return { user: existingUser, ...tokens };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw error;
     }
   }
 }

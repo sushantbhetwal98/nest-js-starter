@@ -8,6 +8,7 @@ import dbConfig from './database/db.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GlobalModule } from './modules/global.module';
 import { ExternalServicesModule } from './modules/external-services/external-services.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ExternalServicesModule } from './modules/external-services/external-ser
       useFactory: async (configService: ConfigService) =>
         configService.get('dbConfig'),
     }),
+    JwtModule.register({ global: true }),
     GlobalModule,
     ExternalServicesModule,
   ],
