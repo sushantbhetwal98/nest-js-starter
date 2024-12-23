@@ -1,4 +1,11 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from './entities/auth.entity';
 import { DataSource, Repository } from 'typeorm';
@@ -6,6 +13,7 @@ import * as crypto from 'crypto';
 import { generateOTP } from 'src/common/utils/generate-otp.utils';
 import { CreateUserDto } from './dto/createUser.dto';
 import { EmailService } from '../external-services/email/email.service';
+import { VerifyUserDto } from './dto/verifyUser.dto';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +35,24 @@ export class AuthService {
       salt,
       hashedValue,
     };
+  }
+
+  async getUserByEmail(email: string) {
+    try {
+      const existingUser = await this.userRepo
+        .createQueryBuilder()
+        .where('email = :email', { email })
+        .getOne();
+
+      if (!existingUser) {
+        throw new NotFoundException('User with the email not found.');
+      }
+      return existingUser;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw error;
+    }
   }
 
   async createUser(user: CreateUserDto) {
@@ -56,7 +82,7 @@ export class AuthService {
 
       const { password, password_salt, otp, ...savedUser } = result.raw[0];
 
-      const emailResponse = await this.emailService.sendOtp(
+      await this.emailService.sendOtp(
         savedUser.first_name,
         savedUser.last_name,
         [savedUser.email],
@@ -68,9 +94,93 @@ export class AuthService {
       return savedUser;
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      if (error instanceof HttpException) throw error;
       if (error.code === '23505') {
         throw new ConflictException('User with the email already exists.');
       }
+      console.log(error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async verifyUser(verifyUserPayload: VerifyUserDto) {
+    try {
+      const existingUser = await this.getUserByEmail(verifyUserPayload.email);
+      if (existingUser.is_active) {
+        throw new BadRequestException('User already verified');
+      }
+
+      if (existingUser.otp_expiry < new Date()) {
+        throw new BadRequestException('OTP Expired');
+      }
+
+      if (existingUser.otp !== verifyUserPayload.otp) {
+        throw new BadRequestException('OTP doesnot match');
+      }
+
+      const updateUser = await this.userRepo
+        .createQueryBuilder()
+        .update()
+        .set({ is_active: true })
+        .where('id = :userId', { userId: existingUser.id })
+        .execute();
+
+      if (!updateUser.affected) {
+        throw new InternalServerErrorException(
+          'Something went wrong. Please try again later.',
+        );
+      }
+      return true;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw error;
+    }
+  }
+
+  async resendOtp(email: string) {
+    // creating query runner for transaction
+    const generatedOtp = generateOTP();
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const updatedUserResponse = await queryRunner.manager
+        .createQueryBuilder()
+        .update(UserEntity)
+        .set({
+          otp: generateOTP,
+          otp_expiry: new Date(new Date().getTime() + 5 * 60 * 1000),
+        })
+        .where('email = :email', { email })
+        .returning('*')
+        .execute();
+
+      if (!updatedUserResponse.affected) {
+        throw new NotFoundException('User with the email not found');
+      }
+
+      const updatedUser = updatedUserResponse.raw[0];
+
+      if (updatedUser.is_active) {
+        throw new BadRequestException('User already verified');
+      }
+
+      await this.emailService.sendOtp(
+        updatedUser.first_name,
+        updatedUser.last_name,
+        [updatedUser.email],
+        updatedUser.otp,
+      );
+
+      await queryRunner.commitTransaction();
+
+      return true;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      if (error instanceof HttpException) throw error;
       console.log(error);
       throw error;
     } finally {
