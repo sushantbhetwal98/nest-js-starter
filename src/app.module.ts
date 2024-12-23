@@ -6,7 +6,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import globalConfiguration from './config/global.config';
 import dbConfig from './database/db.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GlobalModule } from './modules/global.module';
+import { PublicModule } from './modules/public/public.module';
 import { ExternalServicesModule } from './modules/external-services/external-services.module';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -23,7 +23,7 @@ import { JwtModule } from '@nestjs/jwt';
         configService.get('dbConfig'),
     }),
     JwtModule.register({ global: true }),
-    GlobalModule,
+    PublicModule,
     ExternalServicesModule,
   ],
   controllers: [AppController],

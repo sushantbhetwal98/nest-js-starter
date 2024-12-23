@@ -1,16 +1,20 @@
-import { Body, Controller, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserDto } from './dto/createUser.dto';
+import { RegisterUserDto } from './dto/register.dto';
 import { VerifyUserDto } from './dto/verifyUser.dto';
 import { ResendOtpDto } from './dto/resendOtp.dto';
 import { LoginDto } from './dto/login.dto';
+import { AuthGuard } from 'src/common/guards/auth.guard';
+import { GetUser } from 'src/common/decorators/getUser.decorator';
+import { userInterface } from './interfaces/user.interface';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
-@Controller('user')
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('/register')
-  async registerUser(@Body() registerUserPayload: CreateUserDto) {
+  async registerUser(@Body() registerUserPayload: RegisterUserDto) {
     const data = await this.authService.createUser(registerUserPayload);
     return {
       data,
@@ -42,6 +46,22 @@ export class AuthController {
     return {
       data,
       message: 'Login Successful',
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('/change-password')
+  async changePassword(
+    @Body() changePasswordPayload: ChangePasswordDto,
+    @GetUser() user: userInterface,
+  ) {
+    const data = await this.authService.changePassword(
+      changePasswordPayload,
+      user,
+    );
+    return {
+      data,
+      message: 'Password reset successful',
     };
   }
 }

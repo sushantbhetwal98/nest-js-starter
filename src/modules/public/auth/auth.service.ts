@@ -7,26 +7,27 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UserEntity } from './entities/auth.entity';
+import { UserEntity } from '../user/entities/user.entity';
 import { DataSource, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { generateOTP } from 'src/common/utils/generate-otp.utils';
-import { CreateUserDto } from './dto/createUser.dto';
-import { EmailService } from '../external-services/email/email.service';
+import { RegisterUserDto } from './dto/register.dto';
+import { EmailService } from '../../external-services/email/email.service';
 import { VerifyUserDto } from './dto/verifyUser.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { userInterface } from './interfaces/user.interface';
 import globalConfig from 'src/config/global.config';
+import { UserService } from '../user/user.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(UserEntity)
-    private readonly userRepo: Repository<UserEntity>,
     private readonly emailService: EmailService,
     private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
+    private readonly userService: UserService,
   ) {}
 
   private hashValue(value: string, defaultsalt?: string) {
@@ -66,25 +67,7 @@ export class AuthService {
     };
   }
 
-  async getUserByEmail(email: string) {
-    try {
-      const existingUser = await this.userRepo
-        .createQueryBuilder()
-        .where('email = :email', { email })
-        .getOne();
-
-      // if (!existingUser) {
-      //   throw new NotFoundException('User with the email not found.');
-      // }
-      return existingUser;
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      console.log(error);
-      throw error;
-    }
-  }
-
-  async createUser(user: CreateUserDto) {
+  async createUser(user: RegisterUserDto) {
     const { password, ...remainingData } = user;
     const generatedOtp = generateOTP();
     const hashedPasswordData = this.hashValue(password);
@@ -94,22 +77,17 @@ export class AuthService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const result = await queryRunner.manager
-        .createQueryBuilder()
-        .insert()
-        .into(UserEntity)
-        .values({
-          ...remainingData,
-          is_active: false,
-          password: hashedPasswordData.hashedValue,
-          password_salt: hashedPasswordData.salt,
-          otp: generateOTP,
-          otp_expiry: new Date(new Date().getTime() + 5 * 60 * 1000), // 5 minutes from now
-        })
-        .returning('*')
-        .execute();
+      const userPayload = {
+        ...remainingData,
+        is_active: false,
+        password: hashedPasswordData.hashedValue,
+        password_salt: hashedPasswordData.salt,
+        otp: generatedOtp,
+        otp_expiry: new Date(new Date().getTime() + 5 * 60 * 1000), // 5 minutes from now
+      };
 
-      const { password, password_salt, otp, ...savedUser } = result.raw[0];
+      const { password, password_salt, otp, ...savedUser } =
+        await this.userService.createUser(userPayload, queryRunner);
 
       await this.emailService.sendOtp(
         savedUser.first_name,
@@ -124,9 +102,6 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       if (error instanceof HttpException) throw error;
-      if (error.code === '23505') {
-        throw new ConflictException('User with the email already exists.');
-      }
       console.log(error);
       throw error;
     } finally {
@@ -136,7 +111,9 @@ export class AuthService {
 
   async verifyUser(verifyUserPayload: VerifyUserDto) {
     try {
-      const existingUser = await this.getUserByEmail(verifyUserPayload.email);
+      const existingUser = await this.userService.getUserByEmail(
+        verifyUserPayload.email,
+      );
 
       if (!existingUser) {
         throw new NotFoundException('User with the email doesnot exists');
@@ -154,18 +131,10 @@ export class AuthService {
         throw new BadRequestException('OTP doesnot match');
       }
 
-      const updateUser = await this.userRepo
-        .createQueryBuilder()
-        .update()
-        .set({ is_active: true })
-        .where('id = :userId', { userId: existingUser.id })
-        .execute();
+      await this.userService.updateUser(existingUser.id, {
+        is_active: true,
+      });
 
-      if (!updateUser.affected) {
-        throw new InternalServerErrorException(
-          'Something went wrong. Please try again later.',
-        );
-      }
       return true;
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -224,21 +193,27 @@ export class AuthService {
 
   async login(credentials: LoginDto) {
     try {
-      const { password, password_salt, otp, ...existingUser } =
-        await this.getUserByEmail(credentials.email);
+      const existingUser = await this.userService.getUserByEmail(
+        credentials.email,
+      );
       if (!existingUser) {
         throw new BadRequestException('Invalid Credentials');
       }
 
-      const newHashData = this.hashValue(credentials.password, password_salt);
+      const newHashData = this.hashValue(
+        credentials.password,
+        existingUser.password_salt,
+      );
 
-      if (newHashData.hashedValue !== password) {
+      if (newHashData.hashedValue !== existingUser.password) {
         throw new BadRequestException('Invalid Credentials');
       }
 
       const tokens = await this.createTokens(existingUser);
 
-      return { user: existingUser, ...tokens };
+      const { password, password_salt, otp, ...userInfo } = existingUser;
+
+      return { user: userInfo, ...tokens };
     } catch (error) {
       if (error instanceof HttpException) throw error;
       console.log(error);
@@ -246,5 +221,34 @@ export class AuthService {
     }
   }
 
-  async changePassword() {}
+  async changePassword(
+    changePasswordPayload: ChangePasswordDto,
+    user: userInterface,
+  ) {
+    try {
+      const oldHashedPasswordData = this.hashValue(
+        changePasswordPayload.password,
+        user.password_salt,
+      );
+
+      if (oldHashedPasswordData.hashedValue !== user.password) {
+        throw new BadRequestException("Old Password didn't match");
+      }
+
+      const hashedPasswordData = this.hashValue(
+        changePasswordPayload.newPassword,
+      );
+
+      await this.userService.updateUser(user.id, {
+        password: hashedPasswordData.hashedValue,
+        password_salt: hashedPasswordData.salt,
+      });
+
+      return true;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      console.log(error);
+      throw error;
+    }
+  }
 }

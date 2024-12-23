@@ -9,4 +9,7 @@ export interface userInterface {
   middle_name?: string;
   email: string;
   otp_expiry: Date;
+  password: string;
+  password_salt: string;
+  otp: string;
 }

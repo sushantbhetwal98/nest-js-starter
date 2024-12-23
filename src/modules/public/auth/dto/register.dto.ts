@@ -9,7 +9,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-export class CreateUserDto {
+export class RegisterUserDto {
   @IsNotEmpty()
   @IsString()
   @MaxLength(50, { message: 'First Name must be 2 to 50 characters long' })
