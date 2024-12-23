@@ -44,7 +44,7 @@ export class AuthService {
 
   private async createTokens(user: userInterface) {
     const accessToken = await this.jwtService.sign(
-      { user },
+      { id: user.id, email: user.email },
       {
         secret: globalConfig().AUTH.JWT_SECRET,
         expiresIn: globalConfig().AUTH.ACCESS_TOKEN_EXPIRY,
@@ -245,4 +245,6 @@ export class AuthService {
       throw error;
     }
   }
+
+  async changePassword() {}
 }
