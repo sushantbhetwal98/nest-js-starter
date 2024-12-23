@@ -30,7 +30,7 @@ export class UserService {
       return existingUser;
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -48,7 +48,7 @@ export class UserService {
       return existingUser;
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -68,7 +68,7 @@ export class UserService {
       if (error.code === '23505') {
         throw new ConflictException('User with the email already exists.');
       }
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -90,7 +90,7 @@ export class UserService {
       return updatedUser.raw[0];
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }

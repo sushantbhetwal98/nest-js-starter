@@ -39,7 +39,7 @@ export class AuthGuard implements CanActivate {
       if (error instanceof JsonWebTokenError) {
         throw new UnauthorizedException(error.message);
       }
-      console.log(error);
+      console.error(error);
     }
   }
 }

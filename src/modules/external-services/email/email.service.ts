@@ -33,7 +33,7 @@ export class EmailService {
       const data = 'email send successfully';
       return data;
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -56,7 +56,7 @@ export class EmailService {
       await transport.sendMail(options);
       return true;
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }

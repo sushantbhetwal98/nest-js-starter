@@ -102,7 +102,7 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     } finally {
       await queryRunner.release();
@@ -138,7 +138,7 @@ export class AuthService {
       return true;
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -184,7 +184,7 @@ export class AuthService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     } finally {
       await queryRunner.release();
@@ -216,7 +216,7 @@ export class AuthService {
       return { user: userInfo, ...tokens };
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
@@ -247,7 +247,7 @@ export class AuthService {
       return true;
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.log(error);
+      console.error(error);
       throw error;
     }
   }
