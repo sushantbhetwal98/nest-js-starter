@@ -43,14 +43,14 @@ export class AuthService {
   }
 
   private async createTokens(user: userInterface) {
-    const accessToken = await this.jwtService.sign(
+    const accessToken = this.jwtService.sign(
       { id: user.id, email: user.email },
       {
         secret: globalConfig().AUTH.JWT_SECRET,
         expiresIn: globalConfig().AUTH.ACCESS_TOKEN_EXPIRY,
       },
     );
-    const refreshToken = await this.jwtService.sign(
+    const refreshToken = this.jwtService.sign(
       { id: user.id },
       {
         secret: globalConfig().AUTH.JWT_SECRET,
