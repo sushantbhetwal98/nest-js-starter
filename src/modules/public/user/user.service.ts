@@ -80,6 +80,7 @@ export class UserService {
         .update()
         .set(userPayload)
         .where('id = :userId', { userId })
+        .returning('*')
         .execute();
 
       if (!updatedUser.affected) {
@@ -89,6 +90,7 @@ export class UserService {
       }
       return updatedUser.raw[0];
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) throw error;
       console.error(error);
       throw error;
