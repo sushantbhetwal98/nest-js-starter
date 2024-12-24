@@ -17,12 +17,21 @@ export class AuthGuard implements CanActivate {
   ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
+    if (
+      !request.headers['Authorization']?.split(' ') &&
+      !request.headers['authorization']?.split(' ')
+    ) {
+      throw new UnauthorizedException('Please Provide an authorization token');
+    }
+
     const [bearer, accessToken] =
       request.headers['Authorization']?.split(' ') ||
       request.headers['authorization']?.split(' ');
-
     if (!accessToken || bearer !== 'Bearer') {
-      throw new UnauthorizedException('Please provide an authorization token');
+      throw new UnauthorizedException(
+        'Please provide a valid authorization token',
+      );
     }
 
     try {
